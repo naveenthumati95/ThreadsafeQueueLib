@@ -22,19 +22,3 @@ This library provides a safe, scalable alternative to `std::queue` by utilizing 
 
 This project is currently in the **initial implementation and research phase**. Core primitives and the SPSC bounded ring buffer are under active development.
 
-## 💻 Planned Usage
-
-```cpp
-#include <threadsafe_queue/mpsc_bounded.hpp>
-
-// Example: A fixed-capacity MPSC queue for integer messages
-ts_queue::MPSCQueue<int, 4096> msg_queue;
-
-// Producer thread
-msg_queue.push(1024);
-
-// Consumer thread
-int val;
-if (msg_queue.try_pop(val)) {
-    // Process val
-}
