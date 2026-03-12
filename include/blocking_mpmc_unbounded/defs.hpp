@@ -5,8 +5,8 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <atomic>
 #include <type_traits>
+#include <atomic>
 
 namespace tsfqueue::__impl {
 template <typename T> class blocking_mpmc_unbounded {
@@ -26,8 +26,8 @@ private:
   std::unique_ptr<node> head;
   std::mutex tail_mutex;
   node *tail;
-  std::atomic<int> csize; // current size as an atomic variables so that its safe even when both producer and consumer threads change it at same time.
   std::condition_variable cond;
+  std::atomic<int> size_q; // maintains the size of the queue.
 
   // Description of private members :
   // 1. std::mutex head_mutex is used to prevent contention at the head pointer
@@ -53,65 +53,72 @@ private:
   // and do a blocking wait on
 
   // Private member functions :
-
-  node* get_tail(void);
-  std::unique_ptr<node> wait_and_get();
-  std::unique_ptr<node> try_get();
-
   // node *get_tail() : Helper function to get normal pointer to tail at a
   // particular instant std::unique_ptr wait_and_get() : Helper function to
   // blocking wait on unique_ptr of head after popping std::unique_ptr try_get()
   // : Helper function to try to get unique_ptr of head after popping
 
+  // Helper to get the tail pointer at a particular instant
+  node* get_tail();
+
+  // Helper to get the unique_ptr after waiting and popping (wait and pop)
+  std::unique_ptr<node> wait_and_get();
+  
+  // Helper function to try popping the head and get unique_ptr (try pop)
+  std::unique_ptr<node> try_get();
+
 public:
   // Public member functions :
   // Add relevant constructors and destructors -> Add these here only
-  blocking_mpmc_unbounded(){
+
+  blocking_mpmc_unbounded() {
     head = std::make_unique<node>();
     tail = head.get();
-    csize.store(0);
+    size_q.store(0);
   }
-  
-  // Removed Copy constrcutor, because we can't copy this queue, as it has pointers to memory locations.
-  blocking_mpmc_unbounded(const blocking_mpmc_unbounded& other) = delete;
-  blocking_mpmc_unbounded& operator=(const blocking_mpmc_unbounded& other) = delete;
-
-  // Write move constructor and move assignment operator. (TODO)
 
   // 1. void push(value) : Pushes the value inside the queue, copies the value
-  void push(T);
-
   // 2. void wait_and_pop(value ref) : Blocking wait on queue, returns value in
   // the reference passed as parameter
-  void wait_and_pop(T&);
-
   // 3. std::shared_ptr wait_and_pop(void) : Blocking wait on queue, returns
   // value as a shared ptr allocated inside the call
-  std::shared_ptr<T> wait_and_pop(void);
-
   // 4. bool try_pop(value ref) : Returns true and gives the value in reference
   // passed, false otherwise
-  bool try_pop(T&);
-
   // 5. std::shared_ptr try_pop() : Returns a shared ptr with data, returns
   // nullptr if failed
-  std::shared_ptr<T> try_pop();
-
   // 6. bool empty() : Returns whether the queue is empty or not at that instant
-  bool empty();
-
   // 7. Add static asserts
-
-
   // 8. Add emplace_back using perfect forwarding and variadic templates (you
   // can use this in push then)
-  template <typename... Args>
-  void emplace_back(Args&&... args);
-
   // 9. Add size() function
-  int size();
-
   // 10. Any more suggestions ??
+  // 11. Implemented empty_internal().
+
+  // 1:
+  void push(T);
+
+  // 2:
+  void wait_and_pop(T &);
+
+  // 3:
+  std::shared_ptr<T> wait_and_pop();
+
+  // 4:
+  bool try_pop(T &);
+
+  // 5:
+  std::shared_ptr<T> try_pop();
+
+  // 6:
+  bool empty();
+
+  // 7: Static asserts
+
+  // 8: 
+  
+  // 9: 
+  int size();
+  
 };
 } // namespace tsfqueue::__impl
 
