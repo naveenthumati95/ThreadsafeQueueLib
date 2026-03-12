@@ -27,7 +27,7 @@ template <typename T> void queue<T>::push(T value) {
         // std::move() should be used because unique_ptr can not be copied
         tail->next = std::move(new_node);
         tail = new_tail;
-        csize++;
+        size_q++;
     } // created this scope because notifying while holding tail_mutex lock
     //   will cause issue for the consumer (he may try to lock tail but it is
     //   already locked.)

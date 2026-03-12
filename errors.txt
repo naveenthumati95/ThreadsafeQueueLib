@@ -1,0 +1,40 @@
+/*
+Potential Errors and Issues in blocking_mpmc_unbounded implementation:
+
+1. Compilation Errors:
+   - 'csize' is used in push() but 'size_q' is defined in the class.
+   - The lambda in cond.wait() inside wait_and_get() is missing the capture [this].
+   - 'std::cout' and 'std::endl' are used but <iostream> is not included.
+   - 'empty()' is used inside the lambda but it's a member function, so it needs 'this->empty()' or just be captured.
+
+2. Logic Errors:
+   - 'size_q' is incremented in push() but NEVER decremented in any of the pop functions. This leads to:
+     - empty() returning false incorrectly after elements are popped.
+     - size() returning an ever-increasing count.
+     - CRITICAL: After the first element is popped, size_q remains 1. A second call to pop will see empty() as false, skip the wait, and attempt to access head->next->next on a nullptr, causing a SEGFAULT.
+
+3. Thread Safety / Race Conditions:
+   - The queue uses two-lock logic (head_mutex and tail_mutex) but doesn't correctly synchronize access when the queue has 0 or 1 elements.
+   - In push(), tail->next is modified while holding tail_mutex.
+   - In wait_and_get() and try_get(), head->next and head->next->next are read while holding only head_mutex.
+   - If the queue is empty or has one element, tail->next is the same as head->next or head->next->next, leading to a data race because push and pop use different mutexes.
+   - To fix this, pop should typically acquire tail_mutex when it needs to check if head and tail are pointing to the same node or when accessing the last element's next pointer.
+
+4. Redundant/Inconsistent Checks:
+   - In wait_and_get(), after cond.wait() returns, the code calls 'if(empty()) return nullptr;'. If the condition variable predicate (!empty()) is correct, this check is redundant.
+   - However, since size_q isn't decremented, empty() is currently unreliable.
+
+5. Memory Management:
+   - The Node uses std::unique_ptr for 'next'. For very long queues, the default destructor will trigger a recursive chain of deletions that can cause a stack overflow. A manual destructor that iteratively pops nodes is safer.
+
+6. Efficiency:
+   - push(T value) takes the value by value, causing an extra copy/move. Using 'const T&' or 'T&&' (or providing both/emplacing) would be better.
+   - Two allocations per push (one for the node, one for the shared_ptr data). This is a design choice but could be optimized by storing T directly in the Node.
+
+7. Misleading Comments:
+   - The implementation of push puts data into the NEW node, but the comment in defs.hpp says "move the data into the current tail and then change the tail to the new stub." The code actually does the opposite (data goes into the new node, which becomes the new tail, but the head/dummy logic follows a different pattern).
+
+8. Unused Code:
+   - 'get_tail()' is defined but not used in the internal logic.
+
+*/
