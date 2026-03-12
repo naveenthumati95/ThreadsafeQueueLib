@@ -8,25 +8,21 @@ using queue = tsfqueue::__impl::blocking_mpmc_unbounded<T>;
 
 template <typename T> void queue<T>::push(T value) {
     {
-        // Creating a std::unique_ptr for the new node.
-        std::unique_ptr<node> new_node = std::make_unique<node>();
+        // Creating a new stub node.
+        std::unique_ptr<node> stub = std::make_unique<node>();
 
         // Creating a std::shared_ptr to store the value.
         std::shared_ptr<T> val = std::make_shared<T>(value);
-        new_node->data = val;
 
-        // Getting raw pointer of the new_node coz it is the new tail.
-        node* new_tail = new_node.get();
-
-        // Assigning the next pointer of the new_node to nullptr(unique).
-        new_node->next = nullptr;
-
-        // Now we are updating the tail pointer, so we should lock the tail_mutex
         std::lock_guard<std::mutex> lk_tail(tail_mutex);
 
-        // std::move() should be used because unique_ptr can not be copied
-        tail->next = std::move(new_node);
-        tail = new_tail;
+        tail->data=val;
+
+        // saving raw pointer before move
+        node* new_tail=stub.get();
+        tail->next=std::move(stub);
+
+        tail=new_tail;
         size_q++;
     } // created this scope because notifying while holding tail_mutex lock
     //   will cause issue for the consumer (he may try to lock tail but it is
@@ -48,7 +44,7 @@ std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {
     std::unique_lock<std::mutex> lk_head(head_mutex);
 
     // Waiting until there is atleast one element in the queue.
-    cond.wait(lk_head,[](){
+    cond.wait(lk_head,[this](){
         bool flag=empty();
         if(flag)
         {
@@ -62,45 +58,29 @@ std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {
         return nullptr;
     }
 
-    // Checking if there is only one element in the queue,
-    // because we should modify tail if there is only one element.
-    if(head->next->next == nullptr)
-    {
-        std::lock_guard<std::mutex> lk_tail(tail_mutex);
-        tail = head.get();
-    }
+    std::unique_ptr<node> temp=std::move(head->next);
+    std::unique_ptr<node> ret=std::move(head);
 
-    std::unique_ptr<node> temp = std::move(head->next->next);
-
-    // retaining the unique pointer of the element that is to be popped.
-    std::unique_ptr<node> ret = std::move(head->next);
-    head->next = std::move(temp);
+    head=std::move(temp);
+    size_q--;
 
     return ret;
 }
 
 template <typename T> std::unique_ptr<typename queue<T>::node> queue<T>::try_get() {
+
     std::lock_guard<std::mutex> lk_head(head_mutex);
 
-    // returning nullptr if the queue is empty.
     if(empty())
     {
         return nullptr;
     }
 
-    // Checking if there is only one element in the queue,
-    // because we should modify tail if there is only one element.
-    if(head->next->next == nullptr)
-    {
-        std::lock_guard<std::mutex> lk_tail(tail_mutex);
-        tail = head.get();
-    }
+    std::unique_ptr<node> temp=std::move(head->next);
+    std::unique_ptr<node> ret=std::move(head);
 
-    std::unique_ptr<node> temp = std::move(head->next->next);
-
-    // retaining the unique pointer of the element that is to be popped.
-    std::unique_ptr<node> ret = std::move(head->next);
-    head->next = std::move(temp);
+    head=std::move(temp);
+    size_q--;
 
     return ret;
 }
