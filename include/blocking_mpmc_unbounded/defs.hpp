@@ -27,7 +27,7 @@ private:
   std::mutex tail_mutex;
   node *tail;
   std::condition_variable cond;
-  std::atomic<int64_t> size_q; // maintains the size of the queue.
+  size_t size_q;
 
   // Description of private members :
   // 1. std::mutex head_mutex is used to prevent contention at the head pointer
@@ -59,7 +59,7 @@ private:
   // : Helper function to try to get unique_ptr of head after popping
 
   // Helper to get the tail pointer at a particular instant
-  node* get_tail();
+  // node* get_tail();
 
   // Helper to get the unique_ptr after waiting and popping (wait and pop)
   std::unique_ptr<node> wait_and_get();

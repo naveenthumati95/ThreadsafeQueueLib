@@ -9,37 +9,26 @@ using queue = tsfqueue::__impl::blocking_mpmc_unbounded<T>;
 template <typename T>
 void queue<T>::push(T value)
 {
-    {
-        // Creating a new stub node.
-        std::unique_ptr<node> stub = std::make_unique<node>();
+    // Creating a new stub node.
+    std::unique_ptr<node> stub = std::make_unique<node>();
 
-        // Creating a std::shared_ptr to store the value.
-        std::shared_ptr<T> val = std::make_shared<T>(std::move(value));
+    // Creating a std::shared_ptr to store the value.
+    std::shared_ptr<T> val = std::make_shared<T>(std::move(value));
 
-        std::lock_guard<std::mutex> lk_tail(tail_mutex);
+    std::lock_guard<std::mutex> lk_tail(tail_mutex);
 
-        tail->data = val;
+    tail->data = std::move(val);
 
-        // saving raw pointer before move
-        node *new_tail = stub.get();
-        tail->next = std::move(stub);
+    // saving raw pointer before move
+    node *new_tail = stub.get();
+    tail->next = std::move(stub);
 
-        tail = new_tail;
-        size_q++;
-    } // created this scope because notifying while holding tail_mutex lock
-    //   will cause issue for the consumer (he may try to lock tail but it is
-    //   already locked.)
+    tail = new_tail;
+    size_q++;
 
     cond.notify_one();
 
     return;
-}
-
-template <typename T>
-queue<T>::node *queue<T>::get_tail()
-{
-    std::lock_guard<std::mutex> lk_tail(tail_mutex);
-    return tail;
 }
 
 template <typename T>
@@ -54,18 +43,13 @@ std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get()
         bool flag=empty();
         return !flag; });
 
-    if (empty())
-    {
-        return nullptr;
-    }
-
     std::unique_ptr<node> temp = std::move(head->next);
     std::unique_ptr<node> ret = std::move(head);
 
     head = std::move(temp);
     size_q--;
 
-    return ret;
+    return std::move(ret);
 }
 
 template <typename T>
@@ -85,17 +69,13 @@ std::unique_ptr<typename queue<T>::node> queue<T>::try_get()
     head = std::move(temp);
     size_q--;
 
-    return ret;
+    return std::move(ret);
 }
 
 template <typename T>
 void queue<T>::wait_and_pop(T &value)
 {
     std::unique_ptr<queue<T>::node> ret = std::move(wait_and_get());
-    if (ret == nullptr)
-    {
-        return;
-    }
     value = *(ret->data);
     return;
 }
