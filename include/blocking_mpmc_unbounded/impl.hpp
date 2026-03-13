@@ -6,7 +6,9 @@
 template <typename T>
 using queue = tsfqueue::__impl::blocking_mpmc_unbounded<T>;
 
-template <typename T> void queue<T>::push(T value) {
+template <typename T>
+void queue<T>::push(T value)
+{
     {
         // Creating a new stub node.
         std::unique_ptr<node> stub = std::make_unique<node>();
@@ -16,78 +18,81 @@ template <typename T> void queue<T>::push(T value) {
 
         std::lock_guard<std::mutex> lk_tail(tail_mutex);
 
-        tail->data=val;
+        tail->data = val;
 
         // saving raw pointer before move
-        node* new_tail=stub.get();
-        tail->next=std::move(stub);
+        node *new_tail = stub.get();
+        tail->next = std::move(stub);
 
-        tail=new_tail;
+        tail = new_tail;
         size_q++;
     } // created this scope because notifying while holding tail_mutex lock
     //   will cause issue for the consumer (he may try to lock tail but it is
     //   already locked.)
-    
+
     cond.notify_one();
 
     return;
 }
 
-template <typename T> queue<T>::node *queue<T>::get_tail() {
+template <typename T>
+queue<T>::node *queue<T>::get_tail()
+{
     std::lock_guard<std::mutex> lk_tail(tail_mutex);
     return tail;
 }
 
 template <typename T>
-std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {
+std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get()
+{
     // Using unique_lock to lock and unlock on our will.
     std::unique_lock<std::mutex> lk_head(head_mutex);
 
     // Waiting until there is atleast one element in the queue.
-    cond.wait(lk_head,[this](){
+    cond.wait(lk_head, [this]()
+              {
         bool flag=empty();
-        if(flag)
-        {
-            std::cout<<"Waiting for an element to be pushed."<<std::endl;
-        }
-        return !flag;
-    });
+        return !flag; });
 
-    if(empty())
+    if (empty())
     {
         return nullptr;
     }
 
-    std::unique_ptr<node> temp=std::move(head->next);
-    std::unique_ptr<node> ret=std::move(head);
+    std::unique_ptr<node> temp = std::move(head->next);
+    std::unique_ptr<node> ret = std::move(head);
 
-    head=std::move(temp);
+    head = std::move(temp);
     size_q--;
 
     return ret;
 }
 
-template <typename T> std::unique_ptr<typename queue<T>::node> queue<T>::try_get() {
+template <typename T>
+std::unique_ptr<typename queue<T>::node> queue<T>::try_get()
+{
 
     std::lock_guard<std::mutex> lk_head(head_mutex);
 
-    if(empty())
+    if (empty())
     {
         return nullptr;
     }
 
-    std::unique_ptr<node> temp=std::move(head->next);
-    std::unique_ptr<node> ret=std::move(head);
+    std::unique_ptr<node> temp = std::move(head->next);
+    std::unique_ptr<node> ret = std::move(head);
 
-    head=std::move(temp);
+    head = std::move(temp);
     size_q--;
 
     return ret;
 }
 
-template <typename T> void queue<T>::wait_and_pop(T &value) {
+template <typename T>
+void queue<T>::wait_and_pop(T &value)
+{
     std::unique_ptr<queue<T>::node> ret = std::move(wait_and_get());
-    if(ret == nullptr)
+    if (ret == nullptr)
     {
         return;
     }
@@ -95,18 +100,22 @@ template <typename T> void queue<T>::wait_and_pop(T &value) {
     return;
 }
 
-template <typename T> std::shared_ptr<T> queue<T>::wait_and_pop() {
+template <typename T>
+std::shared_ptr<T> queue<T>::wait_and_pop()
+{
     std::unique_ptr<queue<T>::node> ret = std::move(wait_and_get());
-    if(ret == nullptr)
+    if (ret == nullptr)
     {
         return nullptr;
     }
     return ret->data;
 }
 
-template <typename T> bool queue<T>::try_pop(T &value) {
+template <typename T>
+bool queue<T>::try_pop(T &value)
+{
     std::unique_ptr<queue<T>::node> ret = std::move(try_get());
-    if(ret == nullptr)
+    if (ret == nullptr)
     {
         return false;
     }
@@ -114,20 +123,26 @@ template <typename T> bool queue<T>::try_pop(T &value) {
     return true;
 }
 
-template <typename T> std::shared_ptr<T> queue<T>::try_pop() {
+template <typename T>
+std::shared_ptr<T> queue<T>::try_pop()
+{
     std::unique_ptr<queue<T>::node> ret = std::move(try_get());
-    if(ret == nullptr)
+    if (ret == nullptr)
     {
         return nullptr;
     }
     return ret->data;
 }
 
-template <typename T> bool queue<T>::empty() {
-    return (size_q==0);
+template <typename T>
+bool queue<T>::empty()
+{
+    return (size_q == 0);
 }
 
-template <typename T> int queue<T>::size() {
+template <typename T>
+int64_t queue<T>::size()
+{
     return size_q;
 }
 
