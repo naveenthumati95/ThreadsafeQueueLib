@@ -1,7 +1,7 @@
 #ifndef LOCKFREE_SPSC_BOUNDED_DEFS
 #define LOCKFREE_SPSC_BOUNDED_DEFS
 
-#include "utils.hpp"
+#include "../utils.hpp"
 #include <atomic>
 #include <memory>
 #include <type_traits>
