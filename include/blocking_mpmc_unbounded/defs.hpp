@@ -75,9 +75,12 @@ public:
   // Removed Copy constrcutor, because we can't copy this queue, as it has pointers to memory locations.
   blocking_mpmc_unbounded(const blocking_mpmc_unbounded& other) = delete;
   blocking_mpmc_unbounded& operator=(const blocking_mpmc_unbounded& other) = delete;
-
-  // Write move constructor and move assignment operator. (TODO)
-
+  
+  // Removed Move constrcutor, because mutexes are not movable.
+  blocking_mpmc_unbounded(blocking_mpmc_unbounded&& other) = delete;
+  blocking_mpmc_unbounded& operator=(blocking_mpmc_unbounded&& other) = delete;
+  
+  
   // 1. void push(value) : Pushes the value inside the queue, copies the value
   void push(T);
 
