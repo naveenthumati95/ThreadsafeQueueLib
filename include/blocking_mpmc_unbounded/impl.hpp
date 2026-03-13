@@ -14,7 +14,7 @@ void queue<T>::push(T value)
         std::unique_ptr<node> stub = std::make_unique<node>();
 
         // Creating a std::shared_ptr to store the value.
-        std::shared_ptr<T> val = std::make_shared<T>(value);
+        std::shared_ptr<T> val = std::make_shared<T>(std::move(value));
 
         std::lock_guard<std::mutex> lk_tail(tail_mutex);
 

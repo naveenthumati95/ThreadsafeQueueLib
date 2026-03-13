@@ -77,33 +77,22 @@ public:
     size_q.store(0);
   }
 
-  // need to implement our own destructor(recursive destructor may 
+  // need to implement our own destructor(recursive default destructor may 
   // cause stack overflow hence we need to do it iteratively).
-  ~blocking_mpmc_unbounded() = default;
+  ~blocking_mpmc_unbounded() {
+    while(head)
+    {
+      head = std::move(head->next);
+    }
+  }
 
-  // deleting copy constructor and assignment.
+  // disabling copy constructor and assignment.
   blocking_mpmc_unbounded (const blocking_mpmc_unbounded&) = delete;
   blocking_mpmc_unbounded& operator = (const blocking_mpmc_unbounded&) = delete;
 
-  // move constructor and assignment.(wait we can't move mutexes and cond vars?).
-  // so should we disable move operations also??
-  blocking_mpmc_unbounded (blocking_mpmc_unbounded&& other) {
-    head = std::move(other.head);
-    tail = other.tail;
-    other.tail = nullptr;
-    size_q.store(other.size_q.load());
-  }
-
-  blocking_mpmc_unbounded& operator=(blocking_mpmc_unbounded&& other) {
-    if(this != &other)
-    {
-      head = std::move(other.head);
-      tail = other.tail;
-      other.tail = nullptr;
-      size_q.store(other.size_q.load());
-    }
-    return *this;
-  }
+  // disabling move constructor and assignment.(mutexes aren't movable)
+  blocking_mpmc_unbounded (blocking_mpmc_unbounded&&) = delete;
+  blocking_mpmc_unbounded& operator=(blocking_mpmc_unbounded&&) = delete;
 
   // 1. void push(value) : Pushes the value inside the queue, copies the value
   // 2. void wait_and_pop(value ref) : Blocking wait on queue, returns value in
