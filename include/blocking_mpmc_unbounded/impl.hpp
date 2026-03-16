@@ -121,7 +121,7 @@ bool queue<T>::empty()
 }
 
 template <typename T>
-int64_t queue<T>::size()
+size_t queue<T>::size()
 {
     return size_q;
 }

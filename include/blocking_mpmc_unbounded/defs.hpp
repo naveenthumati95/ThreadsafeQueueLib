@@ -74,7 +74,7 @@ public:
   blocking_mpmc_unbounded() {
     head = std::make_unique<node>();
     tail = head.get();
-    size_q.store(0);
+    size_q=0;
   }
 
   // need to implement our own destructor(recursive default destructor may 
@@ -134,7 +134,7 @@ public:
   // 8:
   
   // 9:
-  int64_t size();
+  size_t size();
   
 };
 } // namespace tsfqueue::__impl
