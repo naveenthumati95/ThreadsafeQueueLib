@@ -10,6 +10,17 @@ using queue = tsfqueue::__impl::lockfree_spsc_bounded<T, Capacity>;
 template <typename T, size_t Capacity>
 void queue<T, Capacity>::wait_and_push(T value)
 {
+    while(true){
+    if((tail_cache+1)%Capacity==head_cache){
+      head_cache=head.load();
+    }
+    else{
+      arr[tail_cache]=value;
+      tail_cache=(tail_cache+1)%Capacity;
+      tail.store(tail_cache);
+      break;
+    }
+  }
 }
 
 template <typename T, size_t Capacity>
@@ -36,7 +47,19 @@ bool queue<T, Capacity>::try_pop(T &value)
 }
 
 template <typename T, size_t Capacity>
-void queue<T, Capacity>::wait_and_pop(T &value) {}
+void queue<T, Capacity>::wait_and_pop(T &value) {
+    while(true){
+    if(head_cache==tail_cache){
+      tail_cache=tail.load();
+    }
+    else{
+      value=arr[head_cache];
+      head_cache=(head_cache+1)%Capacity;
+      head.store(head_cache);
+      break;
+    }
+  }
+}
 
 template <typename T, size_t Capacity>
 bool queue<T, Capacity>::peek(T &value) {}
