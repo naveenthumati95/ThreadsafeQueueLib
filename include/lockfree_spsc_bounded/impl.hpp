@@ -2,18 +2,38 @@
 #define LOCKFREE_SPSC_BOUNDED_IMPL_CT
 
 #include "defs.hpp"
+#include <utility>
 
 template <typename T, size_t Capacity>
 using queue = tsfqueue::__impl::lockfree_spsc_bounded<T, Capacity>;
 
 template <typename T, size_t Capacity>
-void queue<T, Capacity>::wait_and_push(T value) {}
+void queue<T, Capacity>::wait_and_push(T value)
+{
+}
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::try_push(T value) {}
+bool queue<T, Capacity>::try_push(T value)
+{
+    return emplace_back(std::move(value));
+}
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::try_pop(T &value) {}
+bool queue<T, Capacity>::try_pop(T &value)
+{
+    if (tail_cache == head_cache)
+    {
+        tail_cache = tail.load(std::memory_order_acquire); // refresh cache
+        if (tail_cache == head_cache) // empty
+        {
+            return false;
+        }
+    }
+    value = arr[head_cache % Capacity];
+    head_cache++;
+    head.store(head_cache, std::memory_order_relaxed);
+    return true;
+}
 
 template <typename T, size_t Capacity>
 void queue<T, Capacity>::wait_and_pop(T &value) {}
@@ -21,7 +41,34 @@ void queue<T, Capacity>::wait_and_pop(T &value) {}
 template <typename T, size_t Capacity>
 bool queue<T, Capacity>::peek(T &value) {}
 
-template <typename T, size_t Capacity> bool queue<T, Capacity>::empty() {}
+template <typename T, size_t Capacity>
+bool queue<T, Capacity>::empty() {}
+
+template <typename T, size_t Capacity>
+template <typename ...Args>
+bool queue<T, Capacity>::emplace_back(Args&&... args)
+{
+    if (tail_cache - head_cache == Capacity)
+    {
+        head_cache = head.load(std::memory_order_relaxed); // refresh cache
+        if (tail_cache - head_cache == Capacity)           // full
+        {
+            return false;
+        }
+    }
+    arr[tail_cache % Capacity] = T(std::forward<Args>(args)...);
+    tail_cache++;
+    tail.store(tail_cache, std::memory_order_release);
+    return true;
+}
+
+template <typename T, size_t Capacity>
+size_t queue<T, Capacity>::size() 
+{
+    size_t t = tail.load(std::memory_order_relaxed);
+    size_t h = head.load(std::memory_order_relaxed);
+    return t - h;
+}
 
 #endif
 
