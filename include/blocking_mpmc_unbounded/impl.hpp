@@ -24,6 +24,8 @@ void queue<T>::push(T value)
     tail->next = std::move(stub);
 
     tail = new_tail;
+
+    std::lock_guard<std::mutex> lk_size(size_mutex);
     size_q++;
 
     cond.notify_one();
@@ -47,6 +49,8 @@ std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get()
     std::unique_ptr<node> ret = std::move(head);
 
     head = std::move(temp);
+
+    std::lock_guard<std::mutex> lk_size(size_mutex);
     size_q--;
 
     return std::move(ret);
@@ -67,6 +71,8 @@ std::unique_ptr<typename queue<T>::node> queue<T>::try_get()
     std::unique_ptr<node> ret = std::move(head);
 
     head = std::move(temp);
+
+    std::lock_guard<std::mutex> lk_size(size_mutex);
     size_q--;
 
     return std::move(ret);
@@ -117,12 +123,39 @@ std::shared_ptr<T> queue<T>::try_pop()
 template <typename T>
 bool queue<T>::empty()
 {
-    return (size_q == 0);
+    std::lock_guard<std::mutex> lk_size(size_mutex);
+    bool flag=(size_q==0);
+
+    return flag;
+}
+
+template <typename T>
+template <typename... Args>
+void queue<T>::emplace_back(Args&&... args)
+{
+    std::unique_ptr<node> stub = std::make_unique<node>();
+
+    std::lock_guard<std::mutex> lock(tail_mutex);
+
+    tail->data = std::make_shared<T>(std::forward<Args>(args)...);
+
+    node* new_tail = stub.get();
+    
+    tail->next = std::move(stub);
+    tail = new_tail;
+    
+    std::lock_guard<std::mutex> lk_size(size_mutex);
+    size_q++;
+    cond.notify_one();
+
+    return;
 }
 
 template <typename T>
 size_t queue<T>::size()
 {
+    std::lock_guard<std::mutex> lk_size(size_mutex);
+    
     return size_q;
 }
 

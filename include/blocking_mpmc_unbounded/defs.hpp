@@ -28,6 +28,7 @@ private:
   node *tail;
   std::condition_variable cond;
   size_t size_q;
+  std::mutex size_mutex; // new mutex for updating size.
 
   // Description of private members :
   // 1. std::mutex head_mutex is used to prevent contention at the head pointer
@@ -130,8 +131,19 @@ public:
   bool empty();
 
   // 7: Static asserts
+  static_assert(std::is_copy_constructible_v<T> || std::is_move_constructible_v<T>, 
+              "T must be copyable or movable to be pushed into the queue.");
+
+  static_assert(std::is_copy_assignable_v<T> || std::is_move_assignable_v<T>, 
+              "T must be copy-assignable or move-assignable to be popped into a reference.");
+
+  static_assert(!std::is_reference_v<T>, 
+              "Queue cannot store reference types.");
+
 
   // 8:
+  template <typename... Args>
+  void emplace_back(Args&&... args);
   
   // 9:
   size_t size();
