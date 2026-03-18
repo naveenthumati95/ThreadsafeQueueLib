@@ -133,6 +133,8 @@ std::shared_ptr<T> queue<T>::peek(){
     }
     return nullptr;
 }
+
+template <typename T>
 std::unique_ptr<typename queue<T>::node> queue<T>::wait_for_and_get(std::chrono::milliseconds timeout)
 {
     // Using unique_lock to lock and unlock on our will.
