@@ -12,14 +12,14 @@ void queue<T, Capacity>::wait_and_push(T value)
 {
   while (true)
   {
-    if ((tail_cache + 1) % Capacity == head_cache)
+    if ((tail_cache + 1) % capacity == head_cache)
     {
       head_cache = head.load();
     }
     else
     {
       arr[tail_cache] = value;
-      tail_cache = (tail_cache + 1) % Capacity;
+      tail_cache = (tail_cache + 1) % capacity;
       tail.store(tail_cache);
       break;
     }
@@ -44,7 +44,7 @@ bool queue<T, Capacity>::try_pop(T &value)
     }
   }
   value = arr[head_cache];
-  head_cache = (head_cache + 1) % Capacity;
+  head_cache = (head_cache + 1) % capacity;
   head.store(head_cache, std::memory_order_release);
   return true;
 }
@@ -61,7 +61,7 @@ void queue<T, Capacity>::wait_and_pop(T &value)
     else
     {
       value = arr[head_cache];
-      head_cache = (head_cache + 1) % Capacity;
+      head_cache = (head_cache + 1) % capacity;
       head.store(head_cache);
       break;
     }
@@ -71,11 +71,11 @@ void queue<T, Capacity>::wait_and_pop(T &value)
 template <typename T, size_t Capacity>
 bool queue<T, Capacity>::peek(T &value)
 {
-  size_t cur_head = head.load();
+  size_t cur_head = head.load(std::memory_order_relaxed);
   if (cur_head == tail_cache)
   {
-    tail_cache = tail.load();
-    if (cur_head == tail_cache)
+    tail_cache = tail.load(std::memory_order_acquire);
+    if (tail_cache == head)
       return false;
   }
   value = arr[cur_head];
@@ -85,23 +85,23 @@ bool queue<T, Capacity>::peek(T &value)
 template <typename T, size_t Capacity>
 bool queue<T, Capacity>::empty()
 {
-  return head.load() == tail.load();
+  return head.load(std::memory_order_acquire) == tail.load(std::memory_order_acquire);
 }
 
 template <typename T, size_t Capacity>
 template <typename... Args>
 bool queue<T, Capacity>::emplace_back(Args &&...args)
 {
-  if ((tail_cache + 1) % Capacity == head_cache)
+  if ((tail_cache + 1) % capacity == head_cache)
   {
     head_cache = head.load(std::memory_order_acquire); // refresh cache
-    if ((tail_cache + 1) % Capacity == head_cache)     // full
+    if ((tail_cache + 1) % capacity == head_cache)     // full
     {
       return false;
     }
   }
   arr[tail_cache] = T(std::forward<Args>(args)...);
-  tail_cache = (tail_cache + 1) % Capacity;
+  tail_cache = (tail_cache + 1) % capacity;
   tail.store(tail_cache, std::memory_order_release);
   return true;
 }
@@ -111,7 +111,7 @@ size_t queue<T, Capacity>::size()
 {
   size_t t = tail.load(std::memory_order_acquire);
   size_t h = head.load(std::memory_order_acquire);
-  return (t - h + Capacity) % Capacity;
+  return (t - h + capacity) % capacity;
 }
 
 #endif

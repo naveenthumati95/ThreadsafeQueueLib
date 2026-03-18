@@ -28,8 +28,9 @@ namespace tsfqueue::__impl
     alignas(tsfq::__impl::cache_line_size) std::atomic<size_t> tail;
     alignas(tsfq::__impl::cache_line_size) size_t head_cache;
     alignas(tsfq::__impl::cache_line_size) size_t tail_cache;
-    T arr[Capacity];
-    static constexpr size_t capacity = Capacity;
+    static constexpr size_t capacity = Capacity + 1;
+    alignas(tsfq::__impl::cache_line_size) T arr[capacity];
+    // aligned the start of the array too
 
     // Description of private members :
     // 1. std::atomic<size_t> head is the atomic head pointer
@@ -45,7 +46,7 @@ namespace tsfqueue::__impl
     // Public Member functions :
     // Add appropriate constructors and destructors -> Add here only
     lockfree_spsc_bounded() : head(0), tail(0), head_cache(0), tail_cache(0) {}
-    
+    ~lockfree_spsc_bounded() = default;
     // 1. void wait_and_push(value) : Busy wait until element is pushed
     void wait_and_push(T);
 
@@ -64,7 +65,7 @@ namespace tsfqueue::__impl
     bool peek(T &);
 
     template <typename... Args>
-    bool emplace_back(Args&&... args);
+    bool emplace_back(Args &&...args);
     size_t size();
     // Will work only in SPSC/MPSC why ?? [Reason this]
     // 7. Add static asserts
@@ -72,6 +73,7 @@ namespace tsfqueue::__impl
     // can use this in push then)
     // 9. Add size() function
     // 10. Any more suggestions ??
+    // can make the functions peek , empty and size const
     // 11. Why no shared_ptr ?? [Reason this]
   };
 } // namespace tsfqueue::__impl
