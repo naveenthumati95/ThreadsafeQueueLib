@@ -73,6 +73,14 @@ public:
     tail = head.get();
     size_q = 0;
   }
+
+  // Implemented an iterative destructor.
+  ~blocking_mpmc_unbounded() {
+    while(head)
+    {
+      head = std::move(head->next);
+    }
+  }
   
   // Removed Copy constrcutor, because we can't copy this queue, as it has pointers to memory locations.
   blocking_mpmc_unbounded(const blocking_mpmc_unbounded& other) = delete;
