@@ -9,24 +9,28 @@ using queue = tsfqueue::__impl::blocking_mpmc_unbounded<T>;
 template <typename T>
 using node = tsfqueue::__utils::Node<T>;
 
+// [Taking as value so that we can directly move it to shared_ptr.]
 template <typename T> void queue<T>::push(T value) {
-    // Block Producer Thread.
+    // Create a new tail node.
+    std::unique_ptr<node> new_tail_unique_ptr = std::make_unique<node>();
+
+    // Created the shared pointer of "value" [We use std::move here because its efficient for bulky 'T']
+    std::shared_ptr<T> shared_ptr_for_value = std::make_shared<T>(std::move(value));
+
+    // Block Producer Thread. [Lock mutex only when needed, so we first do the above two operations]
     std::lock_guard<std::mutex> guard_tail_mutex(tail_mutex);
 
-    // Create a new tail node.
-    tail->next = std::make_unique<node>();
-
-    // Created the shared pointer of "value"
-    tail->data = std::make_shared<T>(value);
+    tail->data = std::move(shared_ptr_for_value);
+    tail->next = std::move(new_tail_unique_ptr);
 
     // Now we move to tail to its next, which is actual tail
-    tail = tail->next.get();
-
-    // Notify any thread (if any) waiting in "wait_and_pop" to wake up and pop.
-    cond.notify_one();
+    tail = tail->next.get();;
 
     // Increment size
     csize.fetch_add(1);
+
+    // Notify any thread (if any) waiting in "wait_and_pop" to wake up and pop.
+    cond.notify_one();
 }
 
 template <typename T> node<T> * queue<T>::get_tail() {
@@ -43,7 +47,7 @@ std::unique_ptr< node<T> > queue<T>::wait_and_get() {
     std::unique_ptr<node> removing_node = std::move(head);
     head = std::move(removing_node->next);
     csize.fetch_sub(1);
-    return removing_node;
+    return std::move(removing_node);
 }
 
 template <typename T> 
@@ -53,7 +57,7 @@ std::unique_ptr< node<T> > queue<T>::try_get() {
         std::unique_ptr<node> removing_node = std::move(head);
         head = std::move(removing_node->next);
         csize.fetch_sub(1);
-        return removing_node;
+        return std::move(removing_node);
     }
     return nullptr;
 }
@@ -97,30 +101,34 @@ bool queue<T>::empty() {
 template <typename T>
 template <typename... Args>
 void queue<T>::emplace_back(Args&&... args){
-    // Get exclusive excess
-    std::lock_guard<std::mutex> guard_tail_mutex(tail_mutex);
-
     // Create a new tail node.
-    tail->next = std::make_unique<node>();
+    std::unique_ptr<node> new_tail_unique_ptr = std::make_unique<node>();
 
     // Emplace the data directly at the memory address of shared_ptr<T>. (Perfect forwarding)
-    tail->data = std::make_shared<T>(std::forward<Args>(args)...);
+    std::shared_ptr<T> shared_ptr_for_value = std::make_shared<T>(std::forward<Args>(args)...);
+
+    // Get exclusive excess [Do it aftere non-critical tasks]
+    std::lock_guard<std::mutex> guard_tail_mutex(tail_mutex);
+
+    tail->data = std::move(shared_ptr_for_value);
+    tail->next = std::move(new_tail_unique_ptr);
 
     // change the tail.
     tail = tail->next.get();
 
-    // Increment size
+    // Increment size [Doing this at the end so that consumer thread does not interfer with this operation.]
     csize.fetch_add(1);
 }
 
 template <typename T>
 size_t queue<T>::size(){
+    
     return csize.load();
 }
 
 #endif
 
-// 1. Add static asserts [?]
+// 1. Add static asserts [DONE]
 // 2. Add emplace_back using perfect forwarding and variadic templates (you
 // can use this in push then) [DONE]
 // 3. Add size() function [DONE]
