@@ -83,6 +83,7 @@ void queue<T>::wait_and_pop(T &value)
 {
     std::unique_ptr<queue<T>::node> ret = std::move(wait_and_get());
     value = *(ret->data);
+
     return;
 }
 
@@ -94,6 +95,7 @@ std::shared_ptr<T> queue<T>::wait_and_pop()
     {
         return nullptr;
     }
+
     return ret->data;
 }
 
@@ -106,6 +108,7 @@ bool queue<T>::try_pop(T &value)
         return false;
     }
     value = *(ret->data);
+
     return true;
 }
 
@@ -117,6 +120,7 @@ std::shared_ptr<T> queue<T>::try_pop()
     {
         return nullptr;
     }
+    
     return ret->data;
 }
 
