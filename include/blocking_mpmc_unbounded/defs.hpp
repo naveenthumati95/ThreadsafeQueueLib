@@ -24,13 +24,10 @@ private:
   // Add private members :
   std::mutex head_mutex;
   std::unique_ptr<node> head;
-
   std::mutex tail_mutex;
   node *tail;
-
-  std::mutex size_mutex;
-  size_t size_q; // current size as an atomic variables so that its safe even when both producer and consumer threads change it at same time.
-  
+  size_t size_q; // newly added -> to maintain size of the queue.
+  std::mutex size_mutex; // newly added -> lock for accessing or modifying size_q.
   std::condition_variable cond;
 
   // Description of private members :
@@ -109,6 +106,14 @@ public:
   bool empty();
 
   // 7. Add static asserts
+  static_assert(std::is_copy_constructible_v(T) || std::is_move_constructible_v<T>,
+  "T must be copyable or movable to be pushed into the queue.");
+
+  static_assert(std::is_copy_assignable_v(T) || std::is_move_assignable_v<T>,
+  "T must be copy-assignable or move-assignable to be popped into a reference.");
+
+ static_assert(!std::is_reference_v<T>, 
+              "Queue cannot store reference types.");
 
   // 8. Add emplace_back using perfect forwarding and variadic templates (you
   // can use this in push then)
