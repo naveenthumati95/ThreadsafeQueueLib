@@ -33,10 +33,36 @@ template <typename T> void queue<T>::push(T value) {
     cond.notify_one();
 }
 
-template <typename T> queue<T>::node *queue<T>::get_tail() {}
+template <typename T> queue<T>::node *queue<T>::get_tail() {
+    // We first lock the tail_mutex
+    std::lock_guard<std::mutex> lock_tail(tail_mutex);
+
+    // Now we simply return the tail
+    return tail;
+}
 
 template <typename T>
-std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {}
+std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {
+    // First we lock the head_mutex;
+    std::unique_lock<std::mutex> lock_head(head_mutex);
+
+    // Waiting for a push
+    cond.wait(lock_head,[this]{
+        bool flag = empty();
+        return !flag;
+    });
+
+    // Creating the unique ptr to return 
+    std::unique_ptr <node> prev = std::move(head);
+    head = std::move(prev->next);
+
+    {
+        std::lock_guard<std::mutex> lock_size(size_mutex);
+        size_q--;
+    }
+
+    return prev;
+}
 
 template <typename T> 
 std::unique_ptr<typename queue<T>::node> queue<T>::try_get() {
@@ -53,9 +79,25 @@ std::unique_ptr<typename queue<T>::node> queue<T>::try_get() {
     return nullptr;
 }
 
-template <typename T> void queue<T>::wait_and_pop(T &value) {}
+template<typename T>
+size_t size(){
+    std::lock_guard<std::mutex> lock_size(size_mutex);
 
-template <typename T> std::shared_ptr<T> queue<T>::wait_and_pop() {}
+    return size_q;
+}
+
+template <typename T> void queue<T>::wait_and_pop(T &value) {
+    std::unique_ptr<node> removed_node = wait_and_get();
+
+    value = std::move(*(removed_node->data));
+}
+
+template <typename T> std::shared_ptr<T> queue<T>::wait_and_pop() {
+    std::unique_ptr<node> removed_node = wait_and_get();
+    
+    // the removed_node->data is already a shared ptr based on the push function
+    return removed_node->data;
+}
 
 template <typename T>
 bool queue<T>::try_pop(T &value) {
