@@ -65,7 +65,11 @@ std::shared_ptr<T> queue<T>::try_pop() {
     }
 }
 
-template <typename T> bool queue<T>::empty() {}
+template <typename T> bool queue<T>::empty() {
+    std::lock_guard<std::mutex> lock_size(size_mutex);
+    
+    return (size_q == 0);
+}
 
 template <typename T>
 template <typename... Args>
@@ -88,6 +92,75 @@ void queue<T>::emplace_back(Args&&... args){
     // Increment size [Doing this at the end so that consumer thread does not interfer with this operation.]
     std::lock_guard<std::mutex> guard_size_mutex(size_mutex);
     size_q++;
+}
+
+template <typename T>
+std::unique_ptr<typename queue<T>::node> queue<T>::wait_for_and_get(std::chrono::milliseconds timeout)
+{
+    // Using unique_lock to lock and unlock on our will.
+    std::unique_lock<std::mutex> lock_head(head_mutex);
+
+    // Waiting at max until timeout ms of time. 
+    if(!cond.wait_for(lock_head,timeout,[this](){
+        bool flag=empty();
+        return !flag;
+    }))
+    {
+        return nullptr;
+    }
+
+    std::unique_ptr<node> new_head = std::move(head->next);
+    std::unique_ptr<node> return_node = std::move(head);
+
+    head = std::move(new_head);
+
+    {
+        std::lock_guard<std::mutex> lock_size(size_mutex);
+        size_q--;
+    }
+
+    return std::move(return_node);
+}
+
+template <typename T>
+std::shared_ptr<T> queue<T>::wait_for_and_pop(std::chrono::milliseconds timeout)
+{
+    std::unique_ptr<queue<T>::node> return_node = std::move(wait_for_and_get(timeout));
+    if (return_node == nullptr)
+    {
+        return nullptr;
+    }
+
+    return return_node->data;
+}
+
+template <typename T>
+bool queue<T>::wait_for_and_pop(T &value,std::chrono::milliseconds timeout)
+{
+    std::unique_ptr<queue<T>::node> return_node = std::move(wait_for_and_get(timeout));
+    if(return_node == nullptr)
+    {
+        return false;
+    }
+
+    value = *(return_node->data);
+
+    return true;
+}
+
+template <typename T>
+void queue<T>::clear()
+{
+    std::lock_guard<std::mutex> lock_head(head_mutex);
+    std::lock_guard<std::mutex> lock_tail(tail_mutex);
+
+    head = std::make_unique<node>();
+    tail = head.get();
+
+    std::lock_guard<std::mutex> lock_size(size_mutex);
+    size_q = 0;
+
+    return;
 }
 
 #endif

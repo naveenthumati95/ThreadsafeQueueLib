@@ -58,7 +58,7 @@ private:
   node* get_tail(void);
   std::unique_ptr<node> wait_and_get();
   std::unique_ptr<node> try_get();
-  std::unique_ptr<node> wait_for_get(std::chrono::milliseconds); // Added New
+  std::unique_ptr<node> wait_for_and_get(std::chrono::milliseconds); // Added New
 
   // node *get_tail() : Helper function to get normal pointer to tail at a
   // particular instant std::unique_ptr wait_and_get() : Helper function to
@@ -132,9 +132,12 @@ public:
   size_t size();
 
   // 10. Any more suggestions ??
-  bool wait_for_pop(T&, std::chrono::milliseconds);
-  std::shared_ptr<T> wait_for_pop(std::chrono::milliseconds);
-  // wait_for_get() added to private section.
+  bool wait_for_and_pop(T&, std::chrono::milliseconds);
+  std::shared_ptr<T> wait_for_and_pop(std::chrono::milliseconds);
+  // wait_for_and_get() added to private section.
+
+  void clear();
+  // clears all the elements in the queue.
 
 };
 } // namespace tsfqueue::__impl
