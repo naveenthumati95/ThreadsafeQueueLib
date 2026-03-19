@@ -38,13 +38,6 @@ template <typename T> void queue<T>::push(T value) {
     return;
 }
 
-template <typename T> queue<T>::node *queue<T>::get_tail() {
-    // We first lock the tail_mutex
-    std::lock_guard<std::mutex> lock_tail(tail_mutex);
-
-    // Now we simply return the tail
-    return tail;
-}
 
 template <typename T>
 std::unique_ptr<typename queue<T>::node> queue<T>::wait_and_get() {

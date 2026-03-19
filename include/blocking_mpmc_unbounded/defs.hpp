@@ -55,12 +55,11 @@ private:
 
   // Private member functions :
 
-  node* get_tail(void);
   std::unique_ptr<node> wait_and_get();
   std::unique_ptr<node> try_get();
   std::unique_ptr<node> wait_for_and_get(std::chrono::milliseconds); // Added New
 
-  // node *get_tail() : Helper function to get normal pointer to tail at a
+  // node *get_tail() : Helper function to get normal pointer to tail at a - removed as not used
   // particular instant std::unique_ptr wait_and_get() : Helper function to
   // blocking wait on unique_ptr of head after popping std::unique_ptr try_get()
   // : Helper function to try to get unique_ptr of head after popping
