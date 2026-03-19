@@ -72,14 +72,13 @@ void queue<T, Capacity>::wait_and_pop(T &value)
 template <typename T, size_t Capacity>
 bool queue<T, Capacity>::peek(T &value)
 {
-  size_t cur_head = head.load(std::memory_order_relaxed);
-  if (cur_head == tail_cache)
+  if (head_cache == tail_cache)
   {
     tail_cache = tail.load(std::memory_order_acquire);
-    if (tail_cache == head)
+    if (tail_cache == head_cache)//empty
       return false;
   }
-  value = arr[cur_head];
+  value = arr[head_cache];
   return true;
 }
 
