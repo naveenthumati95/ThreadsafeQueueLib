@@ -4,15 +4,11 @@
 #include "defs.hpp"
 #include <utility>
 
+namespace tsfqueue::impl {
 template <typename T, size_t Capacity>
-using queue = tsfqueue::__impl::lockfree_spsc_bounded<T, Capacity>;
-
-template <typename T, size_t Capacity>
-void queue<T, Capacity>::wait_and_push(T value)
-{
+void lockfree_spsc_bounded<T, Capacity>::wait_and_push(T value) {
   size_t next_tail = tail_cache + 1;
-  if (next_tail == capacity)
-  {
+  if (next_tail == capacity) {
     next_tail = 0;
   }
 
@@ -21,24 +17,16 @@ void queue<T, Capacity>::wait_and_push(T value)
   int spin = 0;
   bool spun_success = false;
   bool done = false;
-  while (true)
-  {
-    if (next_tail == head_cache)
-    {
+  while (true) {
+    if (next_tail == head_cache) {
       done = true;
       head_cache = head.load(std::memory_order_acquire);
-      if (next_tail == head_cache)
-      {
-        if (spin < spin_threshold)
-        {
+      if (next_tail == head_cache) {
+        if (spin < spin_threshold) {
           // Busy-wait
-        }
-        else if (spin < spin_threshold + 100)
-        {
+        } else if (spin < spin_threshold + 100) {
           std::this_thread::yield();
-        }
-        else
-        {
+        } else {
           head.wait(head_cache, std::memory_order_acquire);
         }
         spin++;
@@ -47,8 +35,7 @@ void queue<T, Capacity>::wait_and_push(T value)
     }
 
     // Refresh head_cache before was_empty calculation to ensure correctness
-    if (!done)
-    {
+    if (!done) {
       head_cache = head.load(std::memory_order_acquire);
     }
     spun_success = (spin < spin_threshold);
@@ -57,8 +44,7 @@ void queue<T, Capacity>::wait_and_push(T value)
     tail_cache = next_tail;
     tail.store(tail_cache, std::memory_order_release);
 
-    if (was_empty)
-    {
+    if (was_empty) {
       tail.notify_one();
     }
     break;
@@ -66,27 +52,21 @@ void queue<T, Capacity>::wait_and_push(T value)
 
   // Adapt spin threshold for next time
   int delta = std::max(1, spin / 10);
-  if (spun_success)
-  {
+  if (spun_success) {
     spin_threshold = std::min(spin_threshold + delta, max_spin);
-  }
-  else
-  {
+  } else {
     spin_threshold = std::max(spin_threshold - delta, min_spin);
   }
 }
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::try_push(T value)
-{
+bool lockfree_spsc_bounded<T, Capacity>::try_push(T value) {
   return emplace_back(std::move(value));
 }
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::try_pop(T &value)
-{
-  if (tail_cache == head_cache)
-  {
+bool lockfree_spsc_bounded<T, Capacity>::try_pop(T &value) {
+  if (tail_cache == head_cache) {
     tail_cache = tail.load(std::memory_order_acquire); // refresh cache
     if (tail_cache == head_cache)                      // empty
     {
@@ -97,39 +77,29 @@ bool queue<T, Capacity>::try_pop(T &value)
   value = arr[head_cache];
   head_cache = (head_cache + 1) % capacity;
   head.store(head_cache, std::memory_order_release);
-  if (was_full)
-  {
+  if (was_full) {
     head.notify_one();
   }
   return true;
 }
 
 template <typename T, size_t Capacity>
-void queue<T, Capacity>::wait_and_pop(T &value)
-{
+void lockfree_spsc_bounded<T, Capacity>::wait_and_pop(T &value) {
   static thread_local int spin_threshold = 100;
   const int min_spin = 10, max_spin = 1000;
   int spin = 0;
   bool spun_success = false;
   bool done = false;
-  while (true)
-  {
-    if (head_cache == tail_cache)
-    {
+  while (true) {
+    if (head_cache == tail_cache) {
       done = true;
       tail_cache = tail.load(std::memory_order_acquire);
-      if (head_cache == tail_cache)
-      {
-        if (spin < spin_threshold)
-        {
+      if (head_cache == tail_cache) {
+        if (spin < spin_threshold) {
           // Busy-wait
-        }
-        else if (spin < spin_threshold + 100)
-        {
+        } else if (spin < spin_threshold + 100) {
           std::this_thread::yield();
-        }
-        else
-        {
+        } else {
           tail.wait(tail_cache, std::memory_order_acquire);
         }
         ++spin;
@@ -138,26 +108,22 @@ void queue<T, Capacity>::wait_and_pop(T &value)
     }
 
     // Refresh tail_cache before was_full calculation to ensure correctness
-    if (!done)
-    {
+    if (!done) {
       tail_cache = tail.load(std::memory_order_acquire);
     }
     spun_success = (spin < spin_threshold);
     size_t next_tail = tail_cache + 1;
-    if (next_tail == capacity)
-    {
+    if (next_tail == capacity) {
       next_tail = 0;
     }
     bool was_full = (next_tail == head_cache);
     value = arr[head_cache];
     head_cache = head_cache + 1;
-    if (head_cache == capacity)
-    {
+    if (head_cache == capacity) {
       head_cache = 0;
     }
     head.store(head_cache, std::memory_order_release);
-    if (was_full)
-    {
+    if (was_full) {
       head.notify_one();
     }
     break;
@@ -165,21 +131,16 @@ void queue<T, Capacity>::wait_and_pop(T &value)
 
   // Adapt spin threshold for next time
   int delta = std::max(1, spin / 10);
-  if (spun_success)
-  {
+  if (spun_success) {
     spin_threshold = std::min(spin_threshold + delta, max_spin);
-  }
-  else
-  {
+  } else {
     spin_threshold = std::max(spin_threshold - delta, min_spin);
   }
 }
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::peek(T &value)
-{
-  if (head_cache == tail_cache)
-  {
+bool lockfree_spsc_bounded<T, Capacity>::peek(T &value) {
+  if (head_cache == tail_cache) {
     tail_cache = tail.load(std::memory_order_acquire);
     if (tail_cache == head_cache) // empty
       return false;
@@ -189,17 +150,15 @@ bool queue<T, Capacity>::peek(T &value)
 }
 
 template <typename T, size_t Capacity>
-bool queue<T, Capacity>::empty()
-{
-  return head.load(std::memory_order_acquire) == tail.load(std::memory_order_acquire);
+bool lockfree_spsc_bounded<T, Capacity>::empty() {
+  return head.load(std::memory_order_acquire) ==
+         tail.load(std::memory_order_acquire);
 }
 
 template <typename T, size_t Capacity>
 template <typename... Args>
-bool queue<T, Capacity>::emplace_back(Args &&...args)
-{
-  if ((tail_cache + 1) % capacity == head_cache)
-  {
+bool lockfree_spsc_bounded<T, Capacity>::emplace_back(Args &&...args) {
+  if ((tail_cache + 1) % capacity == head_cache) {
     head_cache = head.load(std::memory_order_acquire); // refresh cache
     if ((tail_cache + 1) % capacity == head_cache)     // full
     {
@@ -210,20 +169,19 @@ bool queue<T, Capacity>::emplace_back(Args &&...args)
   arr[tail_cache] = T(std::forward<Args>(args)...);
   tail_cache = (tail_cache + 1) % capacity;
   tail.store(tail_cache, std::memory_order_release);
-  if (was_empty)
-  {
+  if (was_empty) {
     tail.notify_one();
   }
   return true;
 }
 
 template <typename T, size_t Capacity>
-size_t queue<T, Capacity>::size()
-{
+size_t lockfree_spsc_bounded<T, Capacity>::size() {
   size_t t = tail.load(std::memory_order_acquire);
   size_t h = head.load(std::memory_order_acquire);
   return (t - h + capacity) % capacity;
 }
+} // namespace tsfqueue::impl
 
 #endif
 

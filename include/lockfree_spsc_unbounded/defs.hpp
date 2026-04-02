@@ -8,7 +8,7 @@
 #include <thread>
 #include <type_traits>
 
-namespace tsfqueue::__impl {
+namespace tsfqueue::impl {
 template <typename T> class lockfree_spsc_unbounded {
   // Works exactly same as the blocking_mpmc_unbounded queue (see this once)
   // with tail pointer pointing to stub node and your head pointer updates as
@@ -48,14 +48,14 @@ template <typename T> class lockfree_spsc_unbounded {
   //  node. We handle the empty queue gracefully as per the pop type.
 
 private:
-  using node = tsfqueue::__utils::Lockless_Node<T>;
+  using node = tsfqueue::utils::Lockless_Node<T>;
 
   // Add the private members :
   // 1. node* head;
   // 2. node* tail;
 
-  alignas(tsfq::__impl::cache_line_size) node *head;
-  alignas(tsfq::__impl::cache_line_size) node *tail;
+  alignas(tsfq::impl::cache_line_size) node *head;
+  alignas(tsfq::impl::cache_line_size) node *tail;
 
   // Description of private members :
   // 1. node* head -> Pointer to the head node
@@ -63,7 +63,7 @@ private:
   // 3. Cache align 1-2
 
   // capacity
-  alignas(tsfq::__impl::cache_line_size) std::atomic<size_t> capacity{0};
+  alignas(tsfq::impl::cache_line_size) std::atomic<size_t> capacity{0};
 
 public:
   // Public member functions :
@@ -137,6 +137,6 @@ public:
   // 10. Why no shared_ptr ?? [Reason this]
   //
 };
-} // namespace tsfqueue::__impl
+} // namespace tsfqueue::impl
 
 #endif
